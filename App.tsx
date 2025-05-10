@@ -6,6 +6,7 @@ import VerificarUsuario from './src/screens/VerificarUsuario';
 import MontarTreino from './src/screens/MontarTreino';
 import TelaAluno from './src/screens/TelaAluno';
 import DetalhesTreino from './src/screens/DetalhesTreino';
+import TelaProfessor from './src/screens/TelaProfessor';
 
 // Definindo os tipos de navegação
 export type RootStackParamList = {
@@ -14,6 +15,7 @@ export type RootStackParamList = {
   TelaAluno: undefined;
   DetalhesTreino: undefined;
   MontarTreino: undefined;
+  TelaProfessor: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -66,6 +68,12 @@ export default function App() {
           name="MontarTreino"
           component={MontarTreino}
           options={{title: 'Montar Treino'}}
+        />
+
+        <Stack.Screen
+          name="TelaProfessor"
+          component={TelaProfessor}
+          options={{title: 'Tela Inicial'}}
         />
       </Stack.Navigator>
     </NavigationContainer>

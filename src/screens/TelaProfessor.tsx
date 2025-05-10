@@ -1,76 +1,76 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
+  FlatList,
+  Alert,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList, Aluno} from '../types';
-
-const alunosMock: Aluno[] = [
-  {
-    id: '1',
-    nome: 'João Silva',
-    email: 'joao@gmail.com',
-    idade: 25,
-    MontarTreino: null,
-  },
-  {
-    id: '2',
-    nome: 'Maria Oliveira',
-    email: 'maria@gmail.com',
-    idade: 22,
-    MontarTreino: null,
-  },
-  {
-    id: '3',
-    nome: 'Carlos Lima',
-    email: 'carlos@gmail.com',
-    idade: 30,
-    MontarTreino: null,
-  },
-];
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {RootStackParamList} from '../types';
+import {StackNavigationProp} from '@react-navigation/stack';
 
 const TelaProfessor = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
-  const [loading, setLoading] = useState(true);
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const [alunos, setAlunos] = useState<any[]>([]);
 
   useEffect(() => {
-    // Simula um carregamento de dados
-    setTimeout(() => {
-      setAlunos(alunosMock);
-      setLoading(false);
-    }, 1000); // simula 1 segundo de delay
+    const fetchAlunos = async () => {
+      try {
+        const alunosList = [];
+        const allKeys = await AsyncStorage.getAllKeys();
+        for (let i = 0; i < allKeys.length; i++) {
+          const email = allKeys[i];
+          const usuarioData = await AsyncStorage.getItem(email);
+          const usuario = usuarioData ? JSON.parse(usuarioData) : null;
+          if (usuario && !usuario.isProfessor) {
+            alunosList.push(usuario);
+          }
+        }
+        setAlunos(alunosList);
+      } catch (error) {
+        console.error('Erro ao carregar alunos:', error);
+        Alert.alert(
+          'Erro',
+          'Não foi possível carregar os alunos. Verifique os dados armazenados.',
+        );
+      }
+    };
+
+    fetchAlunos();
   }, []);
 
-  const abrirDetalhesAluno = (aluno: Aluno) => {
-    navigation.navigate('MontarTreino', {aluno});
+  const handleMontarTreino = (alunoEmail: string) => {
+    // Aqui, você pode redirecionar para uma tela onde o professor monta os treinos
+    const aluno = alunos.find(a => a.email === alunoEmail);
+    if (aluno) {
+      navigation.navigate('MontarTreino', {aluno});
+    } else {
+      Alert.alert('Erro', 'Aluno não encontrado.');
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.titulo}>Lista de Alunos</Text>
+      <Text style={styles.title}>Alunos Cadastrados</Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#007bff" />
+      {alunos.length === 0 ? (
+        <Text style={styles.noAlunosText}>Nenhum aluno cadastrado.</Text>
       ) : (
         <FlatList
           data={alunos}
-          keyExtractor={item => String(item.id)}
+          keyExtractor={item => item.email}
           renderItem={({item}) => (
-            <TouchableOpacity
-              style={styles.item}
-              onPress={() => abrirDetalhesAluno(item)}>
-              <Text style={styles.nome}>{item.nome}</Text>
-              <Text style={styles.email}>{item.email}</Text>
-            </TouchableOpacity>
+            <View style={styles.alunoCard}>
+              <Text style={styles.alunoName}>{item.nome}</Text>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => handleMontarTreino(item.email)}>
+                <Text style={styles.buttonText}>Montar Treino</Text>
+              </TouchableOpacity>
+            </View>
           )}
         />
       )}
@@ -78,32 +78,45 @@ const TelaProfessor = () => {
   );
 };
 
-export default TelaProfessor;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
     backgroundColor: '#fff',
   },
-  titulo: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  item: {
-    padding: 16,
-    backgroundColor: '#f1f1f1',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  nome: {
+  noAlunosText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    color: '#777',
+    textAlign: 'center',
   },
-  email: {
-    fontSize: 14,
-    color: '#666',
+  alunoCard: {
+    padding: 15,
+    borderRadius: 8,
+    backgroundColor: '#f4f4f4',
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  alunoName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  button: {
+    backgroundColor: '#007BFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
   },
 });
+
+export default TelaProfessor;

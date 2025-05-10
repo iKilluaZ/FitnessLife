@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +19,7 @@ import {RootStackParamList} from '../types';
 
 const LoginCadastroScreen = () => {
   const [isCadastro, setIsCadastro] = useState(false);
+  const [isProfessor, setIsProfessor] = useState(false); // Para saber se o usuário é professor
   const [loginData, setLoginData] = useState({
     email: '',
     password: '',
@@ -27,37 +29,44 @@ const LoginCadastroScreen = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    cref: '', // Novo campo para o CREF
   });
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const handleLogin = async () => {
-    if (!loginData.email || !loginData.password) {
-      Alert.alert('Erro', 'Preencha e-mail e senha');
-      return;
-    }
-
     try {
-      const usuarioData = await AsyncStorage.getItem(loginData.email);
-      if (!usuarioData) {
-        Alert.alert('Erro', 'Usuário não encontrado');
+      const usuarioLogado = await AsyncStorage.getItem(cadastroData.email);
+
+      if (!usuarioLogado) {
+        Alert.alert(
+          'Erro',
+          'Usuário não encontrado. Verifique o e-mail e senha.',
+        );
         return;
       }
 
-      const usuario = JSON.parse(usuarioData);
-      if (usuario.password !== loginData.password) {
+      const usuario = JSON.parse(usuarioLogado);
+
+      if (usuario.password !== cadastroData.password) {
         Alert.alert('Erro', 'Senha incorreta');
         return;
       }
 
-      await AsyncStorage.setItem('usuarioLogado', loginData.email);
-
-      navigation.reset({
-        index: 0,
-        routes: [{name: 'TelaAluno'}],
-      });
+      // Verificando se o usuário é professor
+      if (usuario.isProfessor) {
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'TelaProfessor'}],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'TelaAluno'}],
+        });
+      }
     } catch (error) {
       console.error('Erro ao fazer login:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao fazer login');
+      Alert.alert('Erro', 'Ocorreu um erro ao tentar fazer login');
     }
   };
 
@@ -70,6 +79,12 @@ const LoginCadastroScreen = () => {
 
     if (cadastroData.password !== cadastroData.confirmPassword) {
       Alert.alert('Erro', 'As senhas não coincidem');
+      return;
+    }
+
+    // Se for professor, valida o campo CREF
+    if (isProfessor && !cadastroData.cref) {
+      Alert.alert('Erro', 'Por favor, preencha seu CREF');
       return;
     }
 
@@ -86,6 +101,8 @@ const LoginCadastroScreen = () => {
         nome: cadastroData.nome,
         email: cadastroData.email,
         password: cadastroData.password,
+        isProfessor,
+        cref: isProfessor ? cadastroData.cref : '', // Se for professor, adiciona o CREF
       };
 
       // Salva no AsyncStorage (simulando um banco de dados)
@@ -99,11 +116,18 @@ const LoginCadastroScreen = () => {
 
       Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
 
-      // Redireciona para a tela principal
-      navigation.reset({
-        index: 0,
-        routes: [{name: 'TelaAluno'}],
-      });
+      // Redireciona para a tela apropriada
+      if (isProfessor) {
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'TelaProfessor'}],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'TelaAluno'}],
+        });
+      }
     } catch (error) {
       console.error('Erro ao cadastrar:', error);
       Alert.alert('Erro', 'Ocorreu um erro ao cadastrar');
@@ -187,6 +211,27 @@ const LoginCadastroScreen = () => {
           />
         )}
 
+        {/* Switch para saber se é professor */}
+        {isCadastro && (
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchLabel}>Você é professor?</Text>
+            <Switch value={isProfessor} onValueChange={setIsProfessor} />
+          </View>
+        )}
+
+        {/* Campo de CREF (apenas se for professor) */}
+        {isCadastro && isProfessor && (
+          <TextInput
+            style={styles.input}
+            placeholder="CREF"
+            placeholderTextColor="#aaa"
+            value={cadastroData.cref}
+            onChangeText={text =>
+              setCadastroData({...cadastroData, cref: text})
+            }
+          />
+        )}
+
         {/* Esqueceu senha (apenas login) */}
         {!isCadastro && (
           <TouchableOpacity
@@ -265,47 +310,42 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#777',
+    color: '#666',
     marginBottom: 32,
   },
   input: {
     width: '100%',
-    height: 52,
+    padding: 12,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderColor: '#ddd',
+    marginBottom: 12,
     fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: '#f9f9f9',
   },
   forgotContainer: {
-    alignSelf: 'flex-end',
     marginBottom: 24,
   },
   forgotText: {
-    fontSize: 14,
-    color: '#4a6da7',
+    color: '#007BFF',
+    fontSize: 16,
   },
   button: {
+    backgroundColor: '#007BFF',
     width: '100%',
-    height: 52,
-    backgroundColor: '#4a6da7',
-    borderRadius: 12,
-    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 6,
     alignItems: 'center',
     marginBottom: 24,
   },
   buttonText: {
+    fontSize: 18,
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: 24,
+    marginVertical: 16,
   },
   dividerLine: {
     flex: 1,
@@ -314,19 +354,17 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     marginHorizontal: 12,
-    fontSize: 14,
-    color: '#999',
+    fontSize: 16,
+    color: '#aaa',
   },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: '#f5f5f5',
+    padding: 14,
+    borderRadius: 6,
     width: '100%',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   googleIcon: {
     width: 24,
@@ -339,16 +377,26 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    marginTop: 8,
+    alignItems: 'center',
   },
   toggleText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
   },
   toggleLink: {
-    fontSize: 14,
-    color: '#4a6da7',
+    fontSize: 16,
+    color: '#007BFF',
     fontWeight: 'bold',
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333',
+    marginRight: 8,
   },
 });
 
