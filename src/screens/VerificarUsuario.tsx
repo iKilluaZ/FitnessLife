@@ -27,7 +27,7 @@ const TelaInicial: React.FC = () => {
 
         const usuario = JSON.parse(dadosUsuario);
         if (usuario.isProfessor) {
-          navigation.reset({index: 0, routes: [{name: 'MontarTreino'}]});
+          navigation.reset({index: 0, routes: [{name: 'TelaProfesor'}]});
         } else {
           navigation.reset({index: 0, routes: [{name: 'TelaAluno'}]}); // Corrigido para 'TelaAluno'
         }

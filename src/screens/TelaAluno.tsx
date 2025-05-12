@@ -38,25 +38,11 @@ const treinosMock: Treino[] = [
       {nome: 'Tríceps Pulley', series: 3, repeticoes: 15, pausa: 45},
     ],
   },
-  {
-    nomeTreino: 'Treino B - Costas e Bíceps',
-    data: (() => {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      return d.toISOString().split('T')[0];
-    })(),
-    calorias: 450,
-    exercicios: [
-      {nome: 'Puxada Frontal', series: 3, repeticoes: 12, pausa: 60},
-      {nome: 'Rosca Direta', series: 3, repeticoes: 10, pausa: 45},
-    ],
-  },
 ];
 
 const TelaAluno = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
   const [semana] = useState(gerarSemana());
   const [dataSelecionada, setDataSelecionada] = useState(
     new Date().toISOString().split('T')[0],
@@ -77,8 +63,18 @@ const TelaAluno = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Simulando logout. Redirecionando...');
-    navigation.replace('LoginCadastro');
+    Alert.alert('Sair', 'Deseja realmente sair?', [
+      {text: 'Cancelar', style: 'cancel'},
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: () =>
+          navigation.reset({
+            index: 0,
+            routes: [{name: 'LoginCadastro'}],
+          }),
+      },
+    ]);
   };
 
   return (
@@ -131,11 +127,9 @@ const TelaAluno = () => {
         )}
       </ScrollView>
 
-      <View style={styles.logoutContainer}>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Sair</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Sair</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -222,9 +216,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  logoutContainer: {
-    paddingVertical: 10,
   },
   logoutButton: {
     backgroundColor: '#ff4d4d',
