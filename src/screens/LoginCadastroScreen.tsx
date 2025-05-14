@@ -35,7 +35,7 @@ const LoginCadastroScreen = () => {
 
   const handleLogin = async () => {
     try {
-      const usuarioLogado = await AsyncStorage.getItem(cadastroData.email);
+      const usuarioLogado = await AsyncStorage.getItem(loginData.email);
 
       if (!usuarioLogado) {
         Alert.alert(
@@ -47,7 +47,7 @@ const LoginCadastroScreen = () => {
 
       const usuario = JSON.parse(usuarioLogado);
 
-      if (usuario.password !== cadastroData.password) {
+      if (usuario.password !== loginData.password) {
         Alert.alert('Erro', 'Senha incorreta');
         return;
       }

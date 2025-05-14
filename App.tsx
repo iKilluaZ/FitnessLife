@@ -8,10 +8,7 @@ import TelaAluno from './src/screens/TelaAluno';
 import DetalhesTreino from './src/screens/DetalhesTreino';
 import TelaProfessor from './src/screens/TelaProfessor';
 import TelaVisualizarTreino from './src/screens/TelaVisualizarTreino';
-import {initDB} from './src/data/database'; // Adicione esta linha
 
-// Inicializa o banco de dados
-initDB();
 // Definindo os tipos de navegação
 export type RootStackParamList = {
   VerificarUsuario: undefined;
