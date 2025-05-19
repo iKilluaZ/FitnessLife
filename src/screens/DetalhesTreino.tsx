@@ -1,35 +1,88 @@
-import React from 'react';
-import {View, Text, FlatList, StyleSheet} from 'react-native';
-import {RouteProp, useRoute} from '@react-navigation/native';
-import {RootStackParamList} from '../types';
+import React, {useEffect, useState} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
+import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
+import {RootStackParamList, Treino, Exercicio} from '../types';
+import SQLite from 'react-native-sqlite-storage';
 
-type DetalhesTreinoRouteProp = RouteProp<RootStackParamList, 'DetalhesTreino'>;
+const dbPromise = SQLite.openDatabase({
+  name: 'FitnessLifeDB.db',
+  location: 'default',
+});
+
+type DetalhesRouteProp = RouteProp<RootStackParamList, 'DetalhesTreino'>;
 
 const DetalhesTreino = () => {
-  const route = useRoute<DetalhesTreinoRouteProp>();
-  const {treino} = route.params;
+  const route = useRoute<DetalhesRouteProp>();
+  const navigation = useNavigation();
+  const [treinos, setTreinos] = useState<Treino[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const alunoEmail = route.params?.alunoEmail;
+
+    if (!alunoEmail) return;
+
+    (async () => {
+      const db = await dbPromise;
+      db.transaction(tx => {
+        tx.executeSql(
+          `SELECT * FROM treinos WHERE aluno_email = ? ORDER BY data DESC`,
+          [alunoEmail],
+          (_, result) => {
+            const treinosList: Treino[] = [];
+            for (let i = 0; i < result.rows.length; i++) {
+              treinosList.push(result.rows.item(i));
+            }
+            setTreinos(treinosList);
+            setLoading(false);
+          },
+        );
+      });
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text>Carregando treinos...</Text>
+      </View>
+    );
+  }
+
+  if (treinos.length === 0) {
+    return (
+      <View style={styles.centered}>
+        <Text>Nenhum treino encontrado.</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.titulo}>{treino.nomeTreino}</Text>
-
-      <FlatList
-        data={treino.exercicios}
-        keyExtractor={(item, index) => `${item.nome}-${index}`}
-        renderItem={({item}) => (
-          <View style={styles.card}>
-            <Text style={styles.nomeExercicio}>{item.nome}</Text>
-            <Text style={styles.detalhes}>
-              Séries: {item.series} | Repetições: {item.repeticoes}
+    <FlatList
+      data={treinos}
+      keyExtractor={item => item.data}
+      contentContainerStyle={styles.container}
+      renderItem={({item}) => (
+        <View style={styles.card}>
+          <Text style={styles.titulo}>{item.nomeTreino}</Text>
+          <Text style={styles.data}>Data: {item.data}</Text>
+          <Text style={styles.subtitulo}>Exercícios:</Text>
+          {item.exercicios?.map((ex, i) => (
+            <Text key={i} style={styles.exercicio}>
+              • {ex.nome} — {ex.series}x{ex.repeticoes} ({ex.pausa}s)
             </Text>
-            <Text style={styles.detalhes}>Pausa: {item.pausa} seg</Text>
-          </View>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.semDados}>Nenhum exercício encontrado.</Text>
-        }
-      />
-    </View>
+          ))}
+        </View>
+      )}
+    />
   );
 };
 
@@ -37,35 +90,39 @@ export default DetalhesTreino;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#fff',
     padding: 16,
-  },
-  titulo: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#007bff',
-    marginBottom: 20,
+    backgroundColor: '#fff',
   },
   card: {
-    backgroundColor: '#f2f2f2',
+    backgroundColor: '#f0f0f0',
     borderRadius: 8,
-    padding: 15,
-    marginBottom: 12,
+    padding: 16,
+    marginBottom: 16,
   },
-  nomeExercicio: {
+  titulo: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
+    color: '#007BFF',
+    marginBottom: 4,
   },
-  detalhes: {
+  data: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 8,
   },
-  semDados: {
-    textAlign: 'center',
-    color: '#999',
-    marginTop: 30,
-    fontSize: 16,
+  subtitulo: {
+    fontWeight: '600',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  exercicio: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

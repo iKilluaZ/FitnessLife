@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList, Treino} from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {db} from '../data/database';
+import {RootStackParamList, Treino, Exercicio} from '../types';
 
 const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -28,18 +30,6 @@ const gerarSemana = () => {
   return dias;
 };
 
-const treinosMock: Treino[] = [
-  {
-    nomeTreino: 'Treino A - Peito e Tríceps',
-    data: new Date().toISOString().split('T')[0],
-    calorias: 500,
-    exercicios: [
-      {nome: 'Supino Reto', series: 3, repeticoes: 12, pausa: 60},
-      {nome: 'Tríceps Pulley', series: 3, repeticoes: 15, pausa: 45},
-    ],
-  },
-];
-
 const TelaAluno = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -48,18 +38,89 @@ const TelaAluno = () => {
     new Date().toISOString().split('T')[0],
   );
   const [treinoHoje, setTreinoHoje] = useState<Treino | null>(null);
-  const [treinosRealizados] = useState(12);
-  const [caloriasGastas] = useState(3500);
+  const [emailUsuario, setEmailUsuario] = useState('');
+  const [treinosRealizados, setTreinosRealizados] = useState(0);
+  const [caloriasGastas, setCaloriasGastas] = useState(0);
 
   useEffect(() => {
-    const treino = treinosMock.find(t => t.data === dataSelecionada);
-    setTreinoHoje(treino || null);
-  }, [dataSelecionada]);
+    const carregarEmailUsuario = async () => {
+      const email = await AsyncStorage.getItem('usuarioLogado');
+      if (email) {
+        setEmailUsuario(email);
+      } else {
+        Alert.alert('Erro', 'Email do usuário não encontrado');
+      }
+    };
+    carregarEmailUsuario();
+  }, []);
+
+  useEffect(() => {
+    if (emailUsuario) {
+      buscarTreinoDoDia();
+    }
+  }, [emailUsuario, dataSelecionada]);
+
+  const buscarTreinoDoDia = () => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM treinos WHERE aluno_email = ? AND data = ?',
+        [emailUsuario, dataSelecionada],
+        async (_, result) => {
+          if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+
+            // Buscar exercícios relacionados a este treino
+            const treinoId = row.id;
+
+            tx.executeSql(
+              `SELECT e.*, gm.nome AS grupoMuscular 
+               FROM exercicios e 
+               JOIN grupos_musculares gm ON e.grupo_muscular_id = gm.id
+               WHERE e.treino_id = ?`,
+              [treinoId],
+              (_, exResult) => {
+                const exercicios: Exercicio[] = [];
+                for (let i = 0; i < exResult.rows.length; i++) {
+                  exercicios.push(exResult.rows.item(i));
+                }
+
+                const treino: Treino = {
+                  nomeTreino: row.nomeTreino,
+                  data: row.data,
+                  calorias: row.calorias || 0,
+                  exercicios,
+                };
+
+                setTreinoHoje(treino);
+                setTreinosRealizados(1); // Ajustar no futuro se quiser contar
+                setCaloriasGastas(treino.calorias);
+              },
+            );
+          } else {
+            setTreinoHoje(null);
+          }
+        },
+        (_, error) => {
+          console.error('Erro ao buscar treino do dia:', error);
+          return false;
+        },
+      );
+    });
+  };
 
   const iniciarTreino = () => {
     if (treinoHoje) {
-      navigation.navigate('DetalhesTreino', {treino: treinoHoje});
+      navigation.navigate('DetalhesTreino', {
+        treino: treinoHoje,
+        alunoEmail: emailUsuario,
+      });
     }
+  };
+
+  const visualizarTodosTreinos = () => {
+    navigation.navigate('VisualizarTreinos', {
+      aluno: {email: emailUsuario, nome: 'Aluno'},
+    });
   };
 
   const handleLogout = () => {
@@ -125,6 +186,12 @@ const TelaAluno = () => {
             <Text style={styles.textoBotao}>Começar Treino</Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          style={[styles.botao, {backgroundColor: '#28a745'}]}
+          onPress={visualizarTodosTreinos}>
+          <Text style={styles.textoBotao}>Ver Todos os Treinos</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {RouteProp, useRoute, useNavigation} from '@react-navigation/native';
-import {RootStackParamList, Treino} from '../types';
+import {RootStackParamList, Treino, Exercicio} from '../types';
 import {StackNavigationProp} from '@react-navigation/stack';
+import {db} from '../data/database';
 
 type VisualizarTreinosRouteProp = RouteProp<
   RootStackParamList,
@@ -20,29 +20,76 @@ type VisualizarTreinosRouteProp = RouteProp<
 const TelaVisualizarTreinos = () => {
   const route = useRoute<VisualizarTreinosRouteProp>();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-
   const {aluno} = route.params;
+
   const [treinos, setTreinos] = useState<Treino[]>([]);
 
   useEffect(() => {
-    const carregarTreinos = async () => {
-      try {
-        const key = `treinos_${aluno.email}`;
-        const data = await AsyncStorage.getItem(key);
-        const parsedTreinos = data ? JSON.parse(data) : [];
-        setTreinos(parsedTreinos);
-      } catch (error) {
-        console.error('Erro ao carregar treinos:', error);
-        Alert.alert('Erro', 'Não foi possível carregar os treinos.');
-      }
-    };
-
-    carregarTreinos();
+    if (aluno?.email) {
+      carregarTreinosDoBanco(aluno.email);
+    }
   }, [aluno.email]);
+
+  const carregarTreinosDoBanco = (email: string) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM treinos WHERE aluno_email = ? ORDER BY data DESC',
+        [email],
+        (_, result) => {
+          const treinosCarregados: Treino[] = [];
+
+          const processarProximo = (index: number) => {
+            if (index >= result.rows.length) {
+              setTreinos(treinosCarregados);
+              return;
+            }
+
+            const row = result.rows.item(index);
+            const treinoId = row.id;
+
+            tx.executeSql(
+              `SELECT e.*, gm.nome as grupoMuscular 
+               FROM exercicios e 
+               JOIN grupos_musculares gm ON e.grupo_muscular_id = gm.id
+               WHERE e.treino_id = ?`,
+              [treinoId],
+              (_, exResult) => {
+                const exercicios: Exercicio[] = [];
+                for (let i = 0; i < exResult.rows.length; i++) {
+                  exercicios.push(exResult.rows.item(i));
+                }
+
+                treinosCarregados.push({
+                  nomeTreino: row.nomeTreino,
+                  data: row.data,
+                  calorias: row.calorias || 0,
+                  exercicios,
+                });
+
+                processarProximo(index + 1);
+              },
+              (_, err) => {
+                console.error('Erro ao carregar exercícios:', err);
+                processarProximo(index + 1);
+                return false;
+              },
+            );
+          };
+
+          processarProximo(0);
+        },
+        (_, error) => {
+          console.error('Erro ao buscar treinos do banco:', error);
+          Alert.alert('Erro', 'Não foi possível carregar os treinos.');
+          return false;
+        },
+      );
+    });
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Treinos de {aluno.nome}</Text>
+      <Text style={styles.title}>Todos os Treinos de {aluno.nome}</Text>
 
       {treinos.length === 0 ? (
         <Text style={styles.noTreinoText}>Nenhum treino encontrado.</Text>
@@ -58,6 +105,9 @@ const TelaVisualizarTreinos = () => {
               <Text style={styles.cardDate}>Data: {item.data}</Text>
               <Text style={styles.cardInfo}>
                 Exercícios: {item.exercicios.length}
+              </Text>
+              <Text style={styles.cardInfo}>
+                Calorias estimadas: {item.calorias}
               </Text>
             </View>
           )}

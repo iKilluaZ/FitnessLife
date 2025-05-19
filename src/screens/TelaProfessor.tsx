@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -8,67 +8,88 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {RootStackParamList} from '../types';
 import {StackNavigationProp} from '@react-navigation/stack';
+import {RootStackParamList} from '../types';
+import {db} from '../data/database';
+
+type Aluno = {
+  id: number;
+  nome: string;
+  email: string;
+  isProfessor: number;
+};
 
 const TelaProfessor = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const [alunos, setAlunos] = useState<any[]>([]);
+  const [alunos, setAlunos] = useState<Aluno[]>([]);
+
+  const fetchAlunos = () => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM users WHERE isProfessor = 0',
+        [],
+        (_, {rows}) => {
+          const lista: Aluno[] = [];
+          for (let i = 0; i < rows.length; i++) {
+            lista.push(rows.item(i));
+          }
+          setAlunos(lista);
+        },
+        (_, error) => {
+          console.error('Erro ao buscar alunos:', error);
+          Alert.alert('Erro', 'Não foi possível buscar os alunos.');
+          return false;
+        },
+      );
+    });
+  };
 
   useEffect(() => {
-    const fetchAlunos = async () => {
-      try {
-        const alunosList = [];
-        const allKeys = await AsyncStorage.getAllKeys();
-        for (let i = 0; i < allKeys.length; i++) {
-          const email = allKeys[i];
-          const usuarioData = await AsyncStorage.getItem(email);
-          let usuario = null;
-          try {
-            if (usuarioData) {
-              usuario = JSON.parse(usuarioData);
-            }
-          } catch (e) {
-            console.warn(`Erro ao fazer parse do item ${email}:`, usuarioData);
-          }
-
-          if (usuario && !usuario.isProfessor) {
-            alunosList.push(usuario);
-          }
-        }
-        setAlunos(alunosList);
-      } catch (error) {
-        console.error('Erro ao carregar alunos:', error);
-        Alert.alert(
-          'Erro',
-          'Não foi possível carregar os alunos. Verifique os dados armazenados.',
-        );
-      }
-    };
-
     fetchAlunos();
   }, []);
 
-  const handleMontarTreino = (alunoEmail: string) => {
-    const aluno = alunos.find(a => a.email === alunoEmail);
-    if (aluno) {
-      navigation.navigate('MontarTreino', {aluno});
-    } else {
-      Alert.alert('Erro', 'Aluno não encontrado.');
-    }
+  const handleMontarTreino = (aluno: Aluno) => {
+    navigation.navigate('MontarTreino', {
+      aluno: {nome: aluno.nome, email: aluno.email},
+    });
   };
 
-  const deletarAluno = async (email: string) => {
-    try {
-      await AsyncStorage.removeItem(email);
-      await AsyncStorage.removeItem(`treinos_${email}`);
-      setAlunos(prev => prev.filter(a => a.email !== email));
-      Alert.alert('Sucesso', `Aluno ${email} excluído com sucesso.`);
-    } catch (error) {
-      console.error('Erro ao excluir aluno:', error);
-      Alert.alert('Erro', 'Não foi possível excluir o aluno.');
-    }
+  const handleExcluirAluno = (aluno: Aluno) => {
+    Alert.alert(
+      'Confirmar exclusão',
+      `Deseja excluir o aluno ${aluno.nome}?`,
+      [
+        {text: 'Cancelar', style: 'cancel'},
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => {
+            db.transaction(tx => {
+              tx.executeSql(
+                'DELETE FROM users WHERE email = ?',
+                [aluno.email],
+                () => {
+                  fetchAlunos();
+                  Alert.alert('Sucesso', `Aluno ${aluno.nome} excluído.`);
+                },
+                (_, error) => {
+                  console.error('Erro ao excluir aluno:', error);
+                  Alert.alert('Erro', 'Falha ao excluir aluno.');
+                  return false;
+                },
+              );
+            });
+          },
+        },
+      ],
+      {cancelable: true},
+    );
+  };
+
+  const handleVisualizarTreinos = (aluno: Aluno) => {
+    navigation.navigate('VisualizarTreinos', {
+      aluno: {nome: aluno.nome, email: aluno.email},
+    });
   };
 
   const handleLogout = () => {
@@ -110,35 +131,19 @@ const TelaProfessor = () => {
               <View style={styles.buttonsRow}>
                 <TouchableOpacity
                   style={styles.button}
-                  onPress={() => handleMontarTreino(item.email)}>
+                  onPress={() => handleMontarTreino(item)}>
                   <Text style={styles.buttonText}>Montar Treino</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.viewButton}
-                  onPress={() =>
-                    navigation.navigate('VisualizarTreinos', {aluno: item})
-                  }>
+                  onPress={() => handleVisualizarTreinos(item)}>
                   <Text style={styles.buttonText}>Ver Treinos</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.deleteButton}
-                  onPress={() =>
-                    Alert.alert(
-                      'Confirmar exclusão',
-                      `Deseja excluir ${item.nome}?`,
-                      [
-                        {text: 'Cancelar', style: 'cancel'},
-                        {
-                          text: 'Excluir',
-                          style: 'destructive',
-                          onPress: () => deletarAluno(item.email),
-                        },
-                      ],
-                      {cancelable: true},
-                    )
-                  }>
+                  onPress={() => handleExcluirAluno(item)}>
                   <Text style={styles.buttonText}>Excluir</Text>
                 </TouchableOpacity>
               </View>

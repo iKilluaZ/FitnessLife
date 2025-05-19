@@ -13,140 +13,163 @@ import {
   Switch,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../types';
+import {db} from '../data/database';
+import SQLite from 'react-native-sqlite-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginCadastroScreen = () => {
-  const [isCadastro, setIsCadastro] = useState(false);
-  const [isProfessor, setIsProfessor] = useState(false); // Para saber se o usuário é professor
-  const [loginData, setLoginData] = useState({
-    email: '',
-    password: '',
-  });
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const [loginData, setLoginData] = useState({email: '', password: ''});
   const [cadastroData, setCadastroData] = useState({
     nome: '',
     email: '',
     password: '',
     confirmPassword: '',
-    cref: '', // Novo campo para o CREF
+    cref: '',
   });
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const [isCadastro, setIsCadastro] = useState(false);
+  const [isProfessor, setIsProfessor] = useState(false);
 
   const handleLogin = async () => {
+    console.log('🔐 Iniciando login...');
+    console.log('📩 Email:', loginData.email);
+    console.log('🔑 Senha:', loginData.password);
+
+    if (!loginData.email || !loginData.password) {
+      Alert.alert('Erro', 'Preencha todos os campos');
+      return;
+    }
+
     try {
-      const usuarioLogado = await AsyncStorage.getItem(loginData.email);
+      db.transaction((tx: SQLite.Transaction) => {
+        tx.executeSql(
+          'SELECT * FROM users WHERE email = ?',
+          [loginData.email],
+          (_: SQLite.Transaction, result) => {
+            if (result.rows.length === 0) {
+              Alert.alert('Erro', 'Usuário não encontrado.');
+              return;
+            }
 
-      if (!usuarioLogado) {
-        Alert.alert(
-          'Erro',
-          'Usuário não encontrado. Verifique o e-mail e senha.',
+            const usuario: User = result.rows.item(0);
+            console.log('👤 Usuário encontrado:', usuario);
+
+            if (usuario.password !== loginData.password) {
+              Alert.alert('Erro', 'Senha incorreta');
+              return;
+            }
+
+            if (usuario.isProfessor) {
+              console.log('👨‍🏫 Redirecionando para TelaProfessor');
+              navigation.reset({index: 0, routes: [{name: 'TelaProfessor'}]});
+            } else {
+              console.log('👨‍🎓 Redirecionando para TelaAluno');
+              navigation.reset({index: 0, routes: [{name: 'TelaAluno'}]});
+            }
+          },
+          (_: SQLite.Transaction, error) => {
+            console.error('❌ Erro na busca do usuário:', error);
+            Alert.alert('Erro', 'Falha ao buscar usuário');
+            return false;
+          },
         );
-        return;
-      }
-
-      const usuario = JSON.parse(usuarioLogado);
-
-      if (usuario.password !== loginData.password) {
-        Alert.alert('Erro', 'Senha incorreta');
-        return;
-      }
-
-      // Verificando se o usuário é professor
-      if (usuario.isProfessor) {
-        navigation.reset({
-          index: 0,
-          routes: [{name: 'TelaProfessor'}],
-        });
-      } else {
-        navigation.reset({
-          index: 0,
-          routes: [{name: 'TelaAluno'}],
-        });
-      }
+      });
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao tentar fazer login');
+      console.error('❌ Erro geral no login:', error);
+      Alert.alert('Erro', 'Erro inesperado ao tentar fazer login');
     }
   };
 
   const handleCadastro = async () => {
-    // Validações básicas
-    if (!cadastroData.nome || !cadastroData.email || !cadastroData.password) {
-      Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
-      return;
-    }
+    console.log('📝 Iniciando cadastro...');
+    console.log('📨 Dados:', cadastroData);
 
-    if (cadastroData.password !== cadastroData.confirmPassword) {
-      Alert.alert('Erro', 'As senhas não coincidem');
-      return;
-    }
-
-    // Se for professor, valida o campo CREF
-    if (isProfessor && !cadastroData.cref) {
-      Alert.alert('Erro', 'Por favor, preencha seu CREF');
+    if (
+      !cadastroData.nome ||
+      !cadastroData.email ||
+      !cadastroData.password ||
+      cadastroData.password !== cadastroData.confirmPassword
+    ) {
+      Alert.alert('Erro', 'Verifique os dados e confirme a senha corretamente');
       return;
     }
 
     try {
-      // Verifica se o usuário já existe
-      const usuarioExistente = await AsyncStorage.getItem(cadastroData.email);
-      if (usuarioExistente) {
-        Alert.alert('Erro', 'Este e-mail já está cadastrado');
-        return;
-      }
+      db.transaction(tx => {
+        // Verifica se o e-mail já existe
+        tx.executeSql(
+          'SELECT COUNT(*) as total FROM users WHERE email = ?',
+          [cadastroData.email],
+          (_, result) => {
+            const total = result.rows.item(0).total;
+            if (total > 0) {
+              Alert.alert('Erro', 'Este e-mail já está cadastrado');
+              return;
+            }
 
-      // Cria o objeto do usuário
-      const novoUsuario = {
-        nome: cadastroData.nome,
-        email: cadastroData.email,
-        password: cadastroData.password,
-        isProfessor,
-        cref: isProfessor ? cadastroData.cref : '', // Se for professor, adiciona o CREF
-      };
+            // Insere novo usuário
+            tx.executeSql(
+              'INSERT INTO users (nome, email, password, isProfessor, cref) VALUES (?, ?, ?, ?, ?)',
+              [
+                cadastroData.nome,
+                cadastroData.email,
+                cadastroData.password,
+                isProfessor ? 1 : 0,
+                isProfessor ? cadastroData.cref : null,
+              ],
+              (_, result) => {
+                console.log('✅ Usuário cadastrado:', result.insertId);
+                Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
 
-      // Salva no AsyncStorage (simulando um banco de dados)
-      await AsyncStorage.setItem(
-        cadastroData.email,
-        JSON.stringify(novoUsuario),
-      );
+                // Salva o email localmente para uso posterior
+                AsyncStorage.setItem('usuarioLogado', cadastroData.email);
 
-      // Salva como usuário logado
-      await AsyncStorage.setItem('usuarioLogado', cadastroData.email);
-
-      Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
-
-      // Redireciona para a tela apropriada
-      if (isProfessor) {
-        navigation.reset({
-          index: 0,
-          routes: [{name: 'TelaProfessor'}],
-        });
-      } else {
-        navigation.reset({
-          index: 0,
-          routes: [{name: 'TelaAluno'}],
-        });
-      }
+                navigation.reset({
+                  index: 0,
+                  routes: [{name: isProfessor ? 'TelaProfessor' : 'TelaAluno'}],
+                });
+              },
+              (_, error) => {
+                console.error('❌ Erro ao cadastrar usuário:', error);
+                Alert.alert('Erro', 'Erro ao salvar o cadastro');
+                return false;
+              },
+            );
+          },
+          (_, error) => {
+            console.error('❌ Erro ao verificar e-mail existente:', error);
+            Alert.alert('Erro', 'Falha ao verificar e-mail existente');
+            return false;
+          },
+        );
+      });
     } catch (error) {
-      console.error('Erro ao cadastrar:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao cadastrar');
+      console.error('❌ Erro geral no cadastro:', error);
+      Alert.alert('Erro', 'Erro inesperado ao cadastrar');
     }
   };
+
+  interface User {
+    nome: string;
+    email: string;
+    password: string;
+    isProfessor: number;
+    cref?: string | null;
+  }
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Logo */}
         <Image
           source={require('../assets/images/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
 
-        {/* Título */}
         <Text style={styles.title}>
           {isCadastro ? 'Crie sua conta' : 'Bem-vindo de volta!'}
         </Text>
@@ -156,7 +179,6 @@ const LoginCadastroScreen = () => {
             : 'Faça login para continuar'}
         </Text>
 
-        {/* Campos específicos do cadastro */}
         {isCadastro && (
           <TextInput
             style={styles.input}
@@ -169,7 +191,6 @@ const LoginCadastroScreen = () => {
           />
         )}
 
-        {/* Campos comuns */}
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -197,7 +218,6 @@ const LoginCadastroScreen = () => {
           secureTextEntry
         />
 
-        {/* Campo de confirmação de senha (apenas cadastro) */}
         {isCadastro && (
           <TextInput
             style={styles.input}
@@ -211,7 +231,6 @@ const LoginCadastroScreen = () => {
           />
         )}
 
-        {/* Switch para saber se é professor */}
         {isCadastro && (
           <View style={styles.switchContainer}>
             <Text style={styles.switchLabel}>Você é professor?</Text>
@@ -219,7 +238,6 @@ const LoginCadastroScreen = () => {
           </View>
         )}
 
-        {/* Campo de CREF (apenas se for professor) */}
         {isCadastro && isProfessor && (
           <TextInput
             style={styles.input}
@@ -232,7 +250,6 @@ const LoginCadastroScreen = () => {
           />
         )}
 
-        {/* Esqueceu senha (apenas login) */}
         {!isCadastro && (
           <TouchableOpacity
             onPress={() => navigation.navigate('RecuperarSenha')}
@@ -241,7 +258,6 @@ const LoginCadastroScreen = () => {
           </TouchableOpacity>
         )}
 
-        {/* Botão principal */}
         <TouchableOpacity
           style={styles.button}
           onPress={isCadastro ? handleCadastro : handleLogin}>
@@ -250,27 +266,6 @@ const LoginCadastroScreen = () => {
           </Text>
         </TouchableOpacity>
 
-        {/* Divisor */}
-        {!isCadastro && (
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>ou</Text>
-            <View style={styles.dividerLine} />
-          </View>
-        )}
-
-        {/* Botão Google (apenas login) */}
-        {!isCadastro && (
-          <TouchableOpacity style={styles.googleButton}>
-            <Image
-              source={require('../assets/images/google-icon.png')}
-              style={styles.googleIcon}
-            />
-            <Text style={styles.googleText}>Entrar com Google</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Alternar entre login e cadastro */}
         <View style={styles.toggleContainer}>
           <Text style={styles.toggleText}>
             {isCadastro ? 'Já tem uma conta?' : 'Novo por aqui?'}
@@ -285,6 +280,8 @@ const LoginCadastroScreen = () => {
     </KeyboardAvoidingView>
   );
 };
+
+export default LoginCadastroScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -342,39 +339,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ddd',
-  },
-  dividerText: {
-    marginHorizontal: 12,
-    fontSize: 16,
-    color: '#aaa',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 14,
-    borderRadius: 6,
-    width: '100%',
-    marginBottom: 24,
-  },
-  googleIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 12,
-  },
-  googleText: {
-    fontSize: 16,
-    color: '#333',
-  },
   toggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -399,5 +363,3 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 });
-
-export default LoginCadastroScreen;

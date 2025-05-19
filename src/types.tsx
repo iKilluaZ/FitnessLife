@@ -26,11 +26,12 @@ export type Aluno = {
 export type RootStackParamList = {
   LoginCadastro: undefined;
   TelaAluno: undefined;
-  DetalhesTreino: {treino: Treino};
+  DetalhesTreino: {treino: Treino; alunoEmail: string};
   MontarTreino: {aluno: {nome: string; email: string}};
   RecuperarSenha: undefined;
   Cadastro: undefined;
   VisualizarTreinos: {aluno: {nome: string; email: string}};
   VerificarUsuario: undefined;
   TelaProfessor: undefined;
+  TreinoDoDia: {aluno: any};
 };

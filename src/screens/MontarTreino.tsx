@@ -8,10 +8,10 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import {RootStackParamList, Treino, Exercicio} from '../types';
 import {StackNavigationProp} from '@react-navigation/stack';
+import {db} from '../data/database';
 
 type MontarTreinoRouteProp = RouteProp<RootStackParamList, 'MontarTreino'>;
 
@@ -60,59 +60,74 @@ const TelaMontarTreino = () => {
     }
   };
 
+  const atualizarCampo = (
+    grupo: string,
+    nome: string,
+    campo: keyof Exercicio,
+    valor: number,
+  ) => {
+    setExerciciosSelecionados(prev =>
+      prev.map(e =>
+        e.grupo === grupo && e.exercicio.nome === nome
+          ? {...e, exercicio: {...e.exercicio, [campo]: valor}}
+          : e,
+      ),
+    );
+  };
+
   const isSelecionado = (grupo: string, nome: string) =>
     exerciciosSelecionados.some(
       e => e.grupo === grupo && e.exercicio.nome === nome,
     );
 
-  const handleSalvarTreino = async () => {
+  const handleSalvarTreino = () => {
     if (!aluno || !treinoNome || exerciciosSelecionados.length === 0) {
-      Alert.alert(
-        'Erro',
-        'Informe o nome do treino e selecione ao menos um exercício.',
-      );
+      Alert.alert('Erro', 'Informe o nome e ao menos um exercício.');
       return;
     }
 
-    const novoTreino: Treino = {
-      nomeTreino: treinoNome,
-      data: new Date().toISOString().split('T')[0],
-      calorias: 0,
-      exercicios: exerciciosSelecionados.map(e => e.exercicio),
-    };
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO treinos (aluno_email, nomeTreino, data, calorias) VALUES (?, ?, ?, ?)',
+        [aluno.email, treinoNome, new Date().toISOString().split('T')[0], 0],
+        (_, result) => {
+          const treinoId = result.insertId;
 
-    try {
-      const key = `treinos_${aluno.email}`;
-      const dados = await AsyncStorage.getItem(key);
-      const treinos = dados ? JSON.parse(dados) : [];
-      treinos.push(novoTreino);
-      await AsyncStorage.setItem(key, JSON.stringify(treinos));
+          exerciciosSelecionados.forEach(e => {
+            tx.executeSql(
+              'SELECT id FROM grupos_musculares WHERE nome = ?',
+              [e.grupo],
+              (_, res) => {
+                const grupoId = res.rows.item(0).id;
 
-      Alert.alert('Sucesso', 'Treino salvo com sucesso!');
-      navigation.goBack();
-    } catch (error) {
-      console.error('Erro ao salvar treino:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o treino.');
-    }
+                tx.executeSql(
+                  `INSERT INTO exercicios 
+                  (treino_id, grupo_muscular_id, nome, series, repeticoes, pausa) 
+                  VALUES (?, ?, ?, ?, ?, ?)`,
+                  [
+                    treinoId,
+                    grupoId,
+                    e.exercicio.nome,
+                    e.exercicio.series,
+                    e.exercicio.repeticoes,
+                    e.exercicio.pausa,
+                  ],
+                );
+              },
+            );
+          });
+
+          Alert.alert('Sucesso', 'Treino salvo com sucesso!');
+          navigation.goBack();
+        },
+        (_, error) => {
+          console.error('Erro ao salvar treino:', error);
+          Alert.alert('Erro', 'Erro ao salvar treino');
+          return false;
+        },
+      );
+    });
   };
-
-  if (!aluno) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Aluno não encontrado</Text>
-        <TouchableOpacity
-          style={styles.voltarButton}
-          onPress={() =>
-            navigation.reset({
-              index: 0,
-              routes: [{name: 'TelaProfessor'}],
-            })
-          }>
-          <Text style={styles.voltarText}>Voltar para Lista de Alunos</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -128,24 +143,60 @@ const TelaMontarTreino = () => {
       {Object.entries(GRUPOS_MUSCULARES).map(([grupo, exercicios]) => (
         <View key={grupo}>
           <Text style={styles.grupoTitulo}>{grupo}</Text>
-          {exercicios.map(ex => (
-            <TouchableOpacity
-              key={ex}
-              style={[
-                styles.exercicioItem,
-                isSelecionado(grupo, ex) && styles.selecionado,
-              ]}
-              onPress={() => toggleExercicio(grupo, ex)}>
-              <Text
-                style={[
-                  styles.exercicioTexto,
-                  isSelecionado(grupo, ex) && styles.exercicioSelecionadoTexto,
-                ]}>
-                {isSelecionado(grupo, ex) ? '✓ ' : '+ '}
-                {ex}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {exercicios.map(ex => {
+            const selecionado = isSelecionado(grupo, ex);
+            const dados = exerciciosSelecionados.find(
+              e => e.grupo === grupo && e.exercicio.nome === ex,
+            )?.exercicio;
+
+            return (
+              <View key={ex} style={styles.exercicioItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.exercicioItem,
+                    selecionado && styles.selecionado,
+                  ]}
+                  onPress={() => toggleExercicio(grupo, ex)}>
+                  <Text style={styles.exercicioTexto}>
+                    {selecionado ? '✓ ' : '+ '}
+                    {ex}
+                  </Text>
+                </TouchableOpacity>
+
+                {selecionado && dados && (
+                  <View style={styles.parametrosContainer}>
+                    <TextInput
+                      style={styles.parametroInput}
+                      keyboardType="numeric"
+                      placeholder="Séries"
+                      value={String(dados.series)}
+                      onChangeText={text =>
+                        atualizarCampo(grupo, ex, 'series', Number(text))
+                      }
+                    />
+                    <TextInput
+                      style={styles.parametroInput}
+                      keyboardType="numeric"
+                      placeholder="Repetições"
+                      value={String(dados.repeticoes)}
+                      onChangeText={text =>
+                        atualizarCampo(grupo, ex, 'repeticoes', Number(text))
+                      }
+                    />
+                    <TextInput
+                      style={styles.parametroInput}
+                      keyboardType="numeric"
+                      placeholder="Pausa (s)"
+                      value={String(dados.pausa)}
+                      onChangeText={text =>
+                        atualizarCampo(grupo, ex, 'pausa', Number(text))
+                      }
+                    />
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
       ))}
 
@@ -175,10 +226,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#333',
   },
+  exercicioItemContainer: {
+    marginBottom: 10,
+  },
   exercicioItem: {
     padding: 10,
     backgroundColor: '#f9f9f9',
-    marginBottom: 6,
     borderRadius: 6,
   },
   selecionado: {
@@ -188,9 +241,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#007bff',
   },
-  exercicioSelecionadoTexto: {
-    fontWeight: 'bold',
-    color: '#004085',
+  parametrosContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  parametroInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    padding: 8,
+    fontSize: 14,
   },
   botaoSalvar: {
     backgroundColor: '#007BFF',
@@ -202,18 +264,6 @@ const styles = StyleSheet.create({
   botaoTexto: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  voltarButton: {
-    marginTop: 20,
-    backgroundColor: '#6c757d',
-    padding: 14,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  voltarText: {
-    fontSize: 16,
-    color: '#fff',
     fontWeight: 'bold',
   },
 });

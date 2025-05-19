@@ -1,28 +1,25 @@
 import SQLite from 'react-native-sqlite-storage';
 
-// Configuração do banco
 const db = SQLite.openDatabase(
   {name: 'FitnessLifeDB.db', location: 'default'},
-  () => console.log('Database connected'),
-  error => console.error('Database error', error),
+  () => console.log('✅ Database connected'),
+  error => console.error('❌ Database error', error),
 );
 
-// Inicializa todas as tabelas
 const initDB = () => {
   db.transaction(tx => {
-    // Tabela de usuários
+    // Corrigido: ❗ Removida a vírgula extra depois de "cref TEXT"
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        isProfessor BOOLEAN DEFAULT 0,
+        isProfessor INTEGER DEFAULT 0,
         cref TEXT
       );`,
     );
 
-    // Tabela de treinos
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS treinos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +31,6 @@ const initDB = () => {
       );`,
     );
 
-    // Tabela de grupos musculares (nova tabela)
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS grupos_musculares (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +38,6 @@ const initDB = () => {
       );`,
     );
 
-    // Tabela de exercícios (com agrupamento muscular)
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS exercicios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,13 +46,12 @@ const initDB = () => {
         nome TEXT NOT NULL,
         series INTEGER DEFAULT 3,
         repeticoes INTEGER DEFAULT 12,
-        pausa INTEGER DEFAULT 60,  // em segundos
+        pausa INTEGER DEFAULT 60,
         FOREIGN KEY (treino_id) REFERENCES treinos(id) ON DELETE CASCADE,
         FOREIGN KEY (grupo_muscular_id) REFERENCES grupos_musculares(id)
       );`,
     );
 
-    // Insere grupos musculares padrão
     tx.executeSql(
       `INSERT OR IGNORE INTO grupos_musculares (nome) VALUES 
         ('Peito'), ('Costas'), ('Pernas'), 
@@ -66,16 +60,14 @@ const initDB = () => {
   });
 };
 
-// Métodos para exercícios
 const ExercicioService = {
-  // Adiciona um novo exercício
   addExercicio: exercicio => {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
         tx.executeSql(
           `INSERT INTO exercicios 
-          (treino_id, grupo_muscular_id, nome, series, repeticoes, pausa) 
-          VALUES (?, ?, ?, ?, ?, ?)`,
+           (treino_id, grupo_muscular_id, nome, series, repeticoes, pausa) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
           [
             exercicio.treinoId,
             exercicio.grupoMuscularId,
@@ -91,15 +83,14 @@ const ExercicioService = {
     });
   },
 
-  // Busca exercícios por treino
   getExerciciosByTreino: treinoId => {
     return new Promise(resolve => {
       db.transaction(tx => {
         tx.executeSql(
           `SELECT e.*, gm.nome as grupo_muscular 
-          FROM exercicios e
-          JOIN grupos_musculares gm ON e.grupo_muscular_id = gm.id
-          WHERE e.treino_id = ?`,
+           FROM exercicios e
+           JOIN grupos_musculares gm ON e.grupo_muscular_id = gm.id
+           WHERE e.treino_id = ?`,
           [treinoId],
           (_, result) => {
             const exercicios = [];
@@ -113,7 +104,6 @@ const ExercicioService = {
     });
   },
 
-  // Busca todos os grupos musculares
   getGruposMusculares: () => {
     return new Promise(resolve => {
       db.transaction(tx => {
