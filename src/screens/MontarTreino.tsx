@@ -9,7 +9,7 @@ import {
   TextInput,
 } from 'react-native';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
-import {RootStackParamList, Treino, Exercicio} from '../types';
+import {RootStackParamList, Exercicio} from '../types';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {db} from '../data/database';
 
@@ -86,33 +86,47 @@ const TelaMontarTreino = () => {
       return;
     }
 
+    const dataHoje = new Date().toISOString().split('T')[0];
+
     db.transaction(tx => {
       tx.executeSql(
         'INSERT INTO treinos (aluno_email, nomeTreino, data, calorias) VALUES (?, ?, ?, ?)',
-        [aluno.email, treinoNome, new Date().toISOString().split('T')[0], 0],
+        [aluno.email, treinoNome, dataHoje, 0],
         (_, result) => {
           const treinoId = result.insertId;
 
           exerciciosSelecionados.forEach(e => {
+            // Primeiro busca o grupo muscular
             tx.executeSql(
               'SELECT id FROM grupos_musculares WHERE nome = ?',
               [e.grupo],
-              (_, res) => {
-                const grupoId = res.rows.item(0).id;
+              (_, grupoRes) => {
+                if (grupoRes.rows.length > 0) {
+                  const grupoId = grupoRes.rows.item(0).id;
 
-                tx.executeSql(
-                  `INSERT INTO exercicios 
-                  (treino_id, grupo_muscular_id, nome, series, repeticoes, pausa) 
-                  VALUES (?, ?, ?, ?, ?, ?)`,
-                  [
-                    treinoId,
-                    grupoId,
-                    e.exercicio.nome,
-                    e.exercicio.series,
-                    e.exercicio.repeticoes,
-                    e.exercicio.pausa,
-                  ],
-                );
+                  tx.executeSql(
+                    `INSERT INTO exercicios 
+                    (treino_id, grupo_muscular_id, nome, series, repeticoes, pausa) 
+                    VALUES (?, ?, ?, ?, ?, ?)`,
+                    [
+                      treinoId,
+                      grupoId,
+                      e.exercicio.nome,
+                      e.exercicio.series,
+                      e.exercicio.repeticoes,
+                      e.exercicio.pausa,
+                    ],
+                    undefined,
+                    (_, error) => {
+                      console.error('Erro ao inserir exercício:', error);
+                      return false;
+                    },
+                  );
+                }
+              },
+              (_, error) => {
+                console.error('Erro ao buscar grupo muscular:', error);
+                return false;
               },
             );
           });

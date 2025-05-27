@@ -85,6 +85,8 @@ const TelaAluno = () => {
                 }
 
                 const treino: Treino = {
+                  id: row.id,
+                  aluno_email: row.aluno_email,
                   nomeTreino: row.nomeTreino,
                   data: row.data,
                   calorias: row.calorias || 0,

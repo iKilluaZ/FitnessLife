@@ -1,88 +1,35 @@
-import React, {useEffect, useState} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
-import {RootStackParamList, Treino, Exercicio} from '../types';
-import SQLite from 'react-native-sqlite-storage';
-
-const dbPromise = SQLite.openDatabase({
-  name: 'FitnessLifeDB.db',
-  location: 'default',
-});
+import React from 'react';
+import {View, Text, StyleSheet} from 'react-native';
+import {useRoute, RouteProp} from '@react-navigation/native';
+import {RootStackParamList, Treino} from '../types';
 
 type DetalhesRouteProp = RouteProp<RootStackParamList, 'DetalhesTreino'>;
 
 const DetalhesTreino = () => {
   const route = useRoute<DetalhesRouteProp>();
-  const navigation = useNavigation();
-  const [treinos, setTreinos] = useState<Treino[]>([]);
-  const [loading, setLoading] = useState(true);
+  const treino: Treino | undefined = route.params?.treino;
 
-  useEffect(() => {
-    const alunoEmail = route.params?.alunoEmail;
-
-    if (!alunoEmail) return;
-
-    (async () => {
-      const db = await dbPromise;
-      db.transaction(tx => {
-        tx.executeSql(
-          `SELECT * FROM treinos WHERE aluno_email = ? ORDER BY data DESC`,
-          [alunoEmail],
-          (_, result) => {
-            const treinosList: Treino[] = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              treinosList.push(result.rows.item(i));
-            }
-            setTreinos(treinosList);
-            setLoading(false);
-          },
-        );
-      });
-    })();
-  }, []);
-
-  if (loading) {
+  if (!treino) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#007BFF" />
-        <Text>Carregando treinos...</Text>
-      </View>
-    );
-  }
-
-  if (treinos.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <Text>Nenhum treino encontrado.</Text>
+        <Text>Treino não encontrado.</Text>
       </View>
     );
   }
 
   return (
-    <FlatList
-      data={treinos}
-      keyExtractor={item => item.data}
-      contentContainerStyle={styles.container}
-      renderItem={({item}) => (
-        <View style={styles.card}>
-          <Text style={styles.titulo}>{item.nomeTreino}</Text>
-          <Text style={styles.data}>Data: {item.data}</Text>
-          <Text style={styles.subtitulo}>Exercícios:</Text>
-          {item.exercicios?.map((ex, i) => (
-            <Text key={i} style={styles.exercicio}>
-              • {ex.nome} — {ex.series}x{ex.repeticoes} ({ex.pausa}s)
-            </Text>
-          ))}
-        </View>
-      )}
-    />
+    <View style={styles.container}>
+      <View style={styles.card}>
+        <Text style={styles.titulo}>{treino.nomeTreino}</Text>
+        <Text style={styles.data}>Data: {treino.data}</Text>
+        <Text style={styles.subtitulo}>Exercícios:</Text>
+        {treino.exercicios?.map((ex, i) => (
+          <Text key={i} style={styles.exercicio}>
+            • {ex.nome} — {ex.series}x{ex.repeticoes} ({ex.pausa}s)
+          </Text>
+        ))}
+      </View>
+    </View>
   );
 };
 
@@ -92,6 +39,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     backgroundColor: '#fff',
+    flex: 1,
   },
   card: {
     backgroundColor: '#f0f0f0',

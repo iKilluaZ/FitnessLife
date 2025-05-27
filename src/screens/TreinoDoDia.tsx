@@ -56,6 +56,8 @@ const TreinoDoDia = () => {
                     }
 
                     setTreinoHoje({
+                      id: treino.id,
+                      aluno_email: treino.aluno_email,
                       nomeTreino: treino.nomeTreino,
                       data: treino.data,
                       calorias: treino.calorias,

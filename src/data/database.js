@@ -9,26 +9,19 @@ const db = SQLite.openDatabase(
 const initDB = () => {
   db.transaction(tx => {
     // Corrigido: ❗ Removida a vírgula extra depois de "cref TEXT"
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        isProfessor INTEGER DEFAULT 0,
-        cref TEXT
-      );`,
-    );
-
+    // Remova a duplicação e deixe apenas:
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS treinos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        aluno_email TEXT NOT NULL,
-        nomeTreino TEXT NOT NULL,
-        data TEXT NOT NULL,
-        calorias INTEGER DEFAULT 0,
-        FOREIGN KEY (aluno_email) REFERENCES users(email) ON DELETE CASCADE
-      );`,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      aluno_email TEXT NOT NULL,
+      nomeTreino TEXT NOT NULL,
+      data TEXT NOT NULL,
+      calorias INTEGER DEFAULT 0,
+      FOREIGN KEY (aluno_email) REFERENCES users(email) ON DELETE CASCADE
+  );`,
+      [],
+      () => console.log('Tabela treinos criada/verificada'),
+      (_, error) => console.error('Erro ao criar tabela treinos:', error),
     );
 
     tx.executeSql(

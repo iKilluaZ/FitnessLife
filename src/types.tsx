@@ -1,37 +1,46 @@
-export type Exercicio = {
+// Representa um exercício dentro de um treino
+export interface Exercicio {
+  id?: number; // pode ser undefined até ser salvo
   nome: string;
   series: number;
   repeticoes: number;
   pausa: number;
-};
+  grupo_muscular_id?: number;
+  treino_id?: number;
+}
 
-export type Treino = {
+// Representa um treino atribuído a um aluno
+export interface Treino {
+  id?: number;
+  aluno_email: string;
   nomeTreino: string;
   data: string;
   calorias: number;
-  exercicios: Exercicio[];
-};
+  exercicios?: Exercicio[];
+  professor_nome?: string;
+}
 
+// Representa um aluno ou professor no sistema
 export type Aluno = {
-  id?: string;
+  id?: number;
   nome: string;
-  idade?: number;
   email: string;
-  isProfessor?: boolean; // Adicionei para compatibilidade com SQLite
-  cref?: string; // Adicionei para professores
+  idade?: number;
+  isProfessor?: boolean;
+  cref?: string;
   MontarTreino?: Treino[] | null;
 };
 
-// Tipos de navegação (mantenha esses)
+// Tipos de navegação usados no createStackNavigator
 export type RootStackParamList = {
   LoginCadastro: undefined;
   TelaAluno: undefined;
   DetalhesTreino: {treino: Treino; alunoEmail: string};
-  MontarTreino: {aluno: {nome: string; email: string}};
+  MontarTreino: {aluno: Aluno; treino?: Treino}; // agora suporta edição
   RecuperarSenha: undefined;
   Cadastro: undefined;
-  VisualizarTreinos: {aluno: {nome: string; email: string}};
+  VisualizarTreinos: {aluno: Aluno};
   VerificarUsuario: undefined;
   TelaProfessor: undefined;
-  TreinoDoDia: {aluno: any};
+  TreinoDoDia: {aluno: Aluno};
 };
