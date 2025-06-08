@@ -96,7 +96,6 @@ const TelaMontarTreino = () => {
           const treinoId = result.insertId;
 
           exerciciosSelecionados.forEach(e => {
-            // Primeiro busca o grupo muscular
             tx.executeSql(
               'SELECT id FROM grupos_musculares WHERE nome = ?',
               [e.grupo],
@@ -106,8 +105,8 @@ const TelaMontarTreino = () => {
 
                   tx.executeSql(
                     `INSERT INTO exercicios 
-                    (treino_id, grupo_muscular_id, nome, series, repeticoes, pausa) 
-                    VALUES (?, ?, ?, ?, ?, ?)`,
+                     (treino_id, grupo_muscular_id, nome, series, repeticoes, pausa) 
+                     VALUES (?, ?, ?, ?, ?, ?)`,
                     [
                       treinoId,
                       grupoId,
@@ -116,7 +115,7 @@ const TelaMontarTreino = () => {
                       e.exercicio.repeticoes,
                       e.exercicio.pausa,
                     ],
-                    undefined,
+                    () => {},
                     (_, error) => {
                       console.error('Erro ao inserir exercício:', error);
                       return false;
@@ -136,7 +135,7 @@ const TelaMontarTreino = () => {
         },
         (_, error) => {
           console.error('Erro ao salvar treino:', error);
-          Alert.alert('Erro', 'Erro ao salvar treino');
+          Alert.alert('Erro', 'Falha ao salvar o treino.');
           return false;
         },
       );

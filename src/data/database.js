@@ -8,29 +8,61 @@ const db = SQLite.openDatabase(
 
 const initDB = () => {
   db.transaction(tx => {
-    // Corrigido: ❗ Removida a vírgula extra depois de "cref TEXT"
-    // Remova a duplicação e deixe apenas:
+    // Tabela de usuários (se ainda não existir)
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        isProfessor INTEGER DEFAULT 0,
+        cref TEXT
+      );`,
+      [],
+      () => console.log('Tabela users criada/verificada'),
+      (_, error) => console.error('Erro ao criar tabela users:', error),
+    );
+
+    // Tabela de treinos com "data" e "ordem"
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS treinos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      aluno_email TEXT NOT NULL,
-      nomeTreino TEXT NOT NULL,
-      data TEXT NOT NULL,
-      calorias INTEGER DEFAULT 0,
-      FOREIGN KEY (aluno_email) REFERENCES users(email) ON DELETE CASCADE
-  );`,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        aluno_email TEXT NOT NULL,
+        nomeTreino TEXT NOT NULL,
+        data TEXT NOT NULL,
+        calorias INTEGER DEFAULT 0,
+        ordem INTEGER DEFAULT 0,
+        FOREIGN KEY (aluno_email) REFERENCES users(email) ON DELETE CASCADE
+      );`,
       [],
       () => console.log('Tabela treinos criada/verificada'),
       (_, error) => console.error('Erro ao criar tabela treinos:', error),
     );
 
+    // Tabela de grupos musculares
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS grupos_musculares (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT UNIQUE NOT NULL
       );`,
+      [],
+      () => console.log('Tabela grupos_musculares criada/verificada'),
+      (_, error) => console.error('Erro grupos_musculares:', error),
     );
 
+    // Tabela de progresso do aluno
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS progresso_aluno (
+        aluno_email TEXT PRIMARY KEY,
+        ultimo_treino_ordem INTEGER DEFAULT 0,
+        data_ultimo_treino TEXT
+      );`,
+      [],
+      () => console.log('Tabela progresso_aluno criada/verificada'),
+      (_, error) => console.error('Erro progresso_aluno:', error),
+    );
+
+    // Tabela de exercícios
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS exercicios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,16 +75,24 @@ const initDB = () => {
         FOREIGN KEY (treino_id) REFERENCES treinos(id) ON DELETE CASCADE,
         FOREIGN KEY (grupo_muscular_id) REFERENCES grupos_musculares(id)
       );`,
+      [],
+      () => console.log('Tabela exercicios criada/verificada'),
+      (_, error) => console.error('Erro exercicios:', error),
     );
 
+    // Inserção inicial de grupos musculares
     tx.executeSql(
       `INSERT OR IGNORE INTO grupos_musculares (nome) VALUES 
         ('Peito'), ('Costas'), ('Pernas'), 
         ('Ombros'), ('Bíceps'), ('Tríceps'), ('Abdômen');`,
+      [],
+      () => console.log('Grupos musculares inseridos'),
+      (_, error) => console.error('Erro ao inserir grupos:', error),
     );
   });
 };
 
+// Serviço auxiliar para manipular exercícios
 const ExercicioService = {
   addExercicio: exercicio => {
     return new Promise((resolve, reject) => {

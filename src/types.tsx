@@ -1,12 +1,13 @@
 // Representa um exercício dentro de um treino
 export interface Exercicio {
-  id?: number; // pode ser undefined até ser salvo
+  id?: number;
   nome: string;
   series: number;
   repeticoes: number;
   pausa: number;
   grupo_muscular_id?: number;
   treino_id?: number;
+  grupoMuscular?: string; // usado na exibição (opcional)
 }
 
 // Representa um treino atribuído a um aluno
@@ -14,8 +15,9 @@ export interface Treino {
   id?: number;
   aluno_email: string;
   nomeTreino: string;
-  data: string;
   calorias: number;
+  ordem?: number; // ordem sequencial definida pelo professor
+  data?: string; // opcional se for ordem sequencial
   exercicios?: Exercicio[];
   professor_nome?: string;
 }
@@ -31,16 +33,24 @@ export type Aluno = {
   MontarTreino?: Treino[] | null;
 };
 
+// Representa o progresso do aluno com base na ordem
+export interface ProgressoAluno {
+  aluno_email: string;
+  ultimo_treino_ordem: number;
+  data_ultimo_treino: string;
+}
+
 // Tipos de navegação usados no createStackNavigator
 export type RootStackParamList = {
   LoginCadastro: undefined;
   TelaAluno: undefined;
   DetalhesTreino: {treino: Treino; alunoEmail: string};
-  MontarTreino: {aluno: Aluno; treino?: Treino}; // agora suporta edição
+  MontarTreino: {aluno: Aluno; treino?: Treino}; // para edição de treino
   RecuperarSenha: undefined;
   Cadastro: undefined;
   VisualizarTreinos: {aluno: Aluno};
   VerificarUsuario: undefined;
   TelaProfessor: undefined;
   TreinoDoDia: {aluno: Aluno};
+  TelaExecutarTreino: {treinoId: number; alunoEmail: string};
 };

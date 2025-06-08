@@ -101,7 +101,7 @@ const TelaVisualizarTreinos = ({
               },
               (_, error) => {
                 console.error('Erro ao carregar exercícios:', error);
-                carregarExercicios(index + 1); // continua mesmo com erro
+                carregarExercicios(index + 1);
                 return false;
               },
             );
