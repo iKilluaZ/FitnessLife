@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -41,6 +42,7 @@ const TelaAluno = () => {
   const [emailUsuario, setEmailUsuario] = useState('');
   const [treinosRealizados, setTreinosRealizados] = useState(0);
   const [caloriasGastas, setCaloriasGastas] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const carregarEmailUsuario = async () => {
@@ -61,20 +63,19 @@ const TelaAluno = () => {
   }, [emailUsuario, dataSelecionada]);
 
   const buscarTreinoDoDia = () => {
+    setLoading(true);
     db.transaction(tx => {
       tx.executeSql(
         'SELECT * FROM treinos WHERE aluno_email = ? AND data = ?',
         [emailUsuario, dataSelecionada],
-        async (_, result) => {
+        (_, result) => {
           if (result.rows.length > 0) {
             const row = result.rows.item(0);
-
-            // Buscar exercícios relacionados a este treino
             const treinoId = row.id;
 
             tx.executeSql(
-              `SELECT e.*, gm.nome AS grupoMuscular 
-               FROM exercicios e 
+              `SELECT e.*, gm.nome as grupo_muscular
+               FROM exercicios e
                JOIN grupos_musculares gm ON e.grupo_muscular_id = gm.id
                WHERE e.treino_id = ?`,
               [treinoId],
@@ -84,26 +85,27 @@ const TelaAluno = () => {
                   exercicios.push(exResult.rows.item(i));
                 }
 
-                const treino: Treino = {
+                setTreinoHoje({
                   id: row.id,
                   aluno_email: row.aluno_email,
                   nomeTreino: row.nomeTreino,
                   data: row.data,
                   calorias: row.calorias || 0,
                   exercicios,
-                };
-
-                setTreinoHoje(treino);
-                setTreinosRealizados(1); // Ajustar no futuro se quiser contar
-                setCaloriasGastas(treino.calorias);
+                });
+                setTreinosRealizados(1);
+                setCaloriasGastas(row.calorias || 0);
+                setLoading(false);
               },
             );
           } else {
             setTreinoHoje(null);
+            setLoading(false);
           }
         },
         (_, error) => {
           console.error('Erro ao buscar treino do dia:', error);
+          setLoading(false);
           return false;
         },
       );
@@ -122,6 +124,7 @@ const TelaAluno = () => {
   const visualizarTodosTreinos = () => {
     navigation.navigate('VisualizarTreinos', {
       aluno: {email: emailUsuario, nome: 'Aluno'},
+      isProfessor: false,
     });
   };
 
@@ -168,32 +171,39 @@ const TelaAluno = () => {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.tituloTreino}>Treino do Dia</Text>
-        <Text style={styles.nomeTreino}>
-          {treinoHoje ? treinoHoje.nomeTreino : 'Nenhum treino disponível'}
-        </Text>
 
-        <View style={styles.cardContainer}>
-          <View style={styles.card}>
-            <Text style={styles.cardNumero}>{treinosRealizados}</Text>
-            <Text style={styles.cardTexto}>Treinos Realizados</Text>
-          </View>
-          <View style={styles.card}>
-            <Text style={styles.cardNumero}>{caloriasGastas}</Text>
-            <Text style={styles.cardTexto}>Calorias Gastas</Text>
-          </View>
-        </View>
+        {loading ? (
+          <ActivityIndicator size="large" color="#007bff" />
+        ) : (
+          <>
+            <Text style={styles.nomeTreino}>
+              {treinoHoje ? treinoHoje.nomeTreino : 'Nenhum treino disponível'}
+            </Text>
 
-        {treinoHoje && (
-          <TouchableOpacity style={styles.botao} onPress={iniciarTreino}>
-            <Text style={styles.textoBotao}>Começar Treino</Text>
-          </TouchableOpacity>
+            <View style={styles.cardContainer}>
+              <View style={styles.card}>
+                <Text style={styles.cardNumero}>{treinosRealizados}</Text>
+                <Text style={styles.cardTexto}>Treinos Realizados</Text>
+              </View>
+              <View style={styles.card}>
+                <Text style={styles.cardNumero}>{caloriasGastas}</Text>
+                <Text style={styles.cardTexto}>Calorias Gastas</Text>
+              </View>
+            </View>
+
+            {treinoHoje && (
+              <TouchableOpacity style={styles.botao} onPress={iniciarTreino}>
+                <Text style={styles.textoBotao}>Começar Treino</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.botao, {backgroundColor: '#28a745'}]}
+              onPress={visualizarTodosTreinos}>
+              <Text style={styles.textoBotao}>Ver Todos os Treinos</Text>
+            </TouchableOpacity>
+          </>
         )}
-
-        <TouchableOpacity
-          style={[styles.botao, {backgroundColor: '#28a745'}]}
-          onPress={visualizarTodosTreinos}>
-          <Text style={styles.textoBotao}>Ver Todos os Treinos</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -208,7 +218,7 @@ export default TelaAluno;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
     paddingTop: 20,
     paddingHorizontal: 16,
   },
@@ -221,10 +231,14 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#ddd',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   diaItemSelecionado: {
     backgroundColor: '#007bff',
@@ -241,10 +255,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   tituloTreino: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
+    color: '#343a40',
   },
   nomeTreino: {
     fontSize: 18,
@@ -258,19 +272,23 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '48%',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   cardNumero: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#007bff',
   },
   cardTexto: {
     fontSize: 14,
-    color: '#666',
+    color: '#555',
     marginTop: 5,
     textAlign: 'center',
   },
@@ -280,14 +298,18 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   textoBotao: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   logoutButton: {
-    backgroundColor: '#ff4d4d',
+    backgroundColor: '#dc3545',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',

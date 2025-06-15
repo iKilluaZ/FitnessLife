@@ -20,6 +20,7 @@ export interface Treino {
   data?: string; // opcional se for ordem sequencial
   exercicios?: Exercicio[];
   professor_nome?: string;
+  professor_email?: string; // novo campo para e-mail do professor
 }
 
 // Representa um aluno ou professor no sistema
@@ -44,11 +45,11 @@ export interface ProgressoAluno {
 export type RootStackParamList = {
   LoginCadastro: undefined;
   TelaAluno: undefined;
-  DetalhesTreino: {treino: Treino; alunoEmail: string};
-  MontarTreino: {aluno: Aluno; treino?: Treino}; // para edição de treino
+  DetalhesTreino: {treino: Treino; alunoEmail: string; professorEmail?: string};
+  MontarTreino: {aluno: Aluno; treino?: Treino; professorEmail?: string}; // <-- aqui
   RecuperarSenha: undefined;
   Cadastro: undefined;
-  VisualizarTreinos: {aluno: Aluno};
+  VisualizarTreinos: {aluno: Aluno; isProfessor: boolean};
   VerificarUsuario: undefined;
   TelaProfessor: undefined;
   TreinoDoDia: {aluno: Aluno};

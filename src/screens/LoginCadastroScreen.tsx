@@ -47,7 +47,7 @@ const LoginCadastroScreen = () => {
         tx.executeSql(
           'SELECT * FROM users WHERE email = ?',
           [loginData.email],
-          (_: SQLite.Transaction, result) => {
+          async (_: SQLite.Transaction, result) => {
             if (result.rows.length === 0) {
               Alert.alert('Erro', 'Usuário não encontrado.');
               return;
@@ -60,6 +60,9 @@ const LoginCadastroScreen = () => {
               Alert.alert('Erro', 'Senha incorreta');
               return;
             }
+
+            // Salva o e-mail do usuário logado no AsyncStorage
+            await AsyncStorage.setItem('usuarioLogado', usuario.email);
 
             if (usuario.isProfessor) {
               console.log('👨‍🏫 Redirecionando para TelaProfessor');
@@ -119,12 +122,12 @@ const LoginCadastroScreen = () => {
                 isProfessor ? 1 : 0,
                 isProfessor ? cadastroData.cref : null,
               ],
-              (_, result) => {
+              async (_, result) => {
                 console.log('✅ Usuário cadastrado:', result.insertId);
                 Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
 
                 // Salva o email localmente para uso posterior
-                AsyncStorage.setItem('usuarioLogado', cadastroData.email);
+                await AsyncStorage.setItem('usuarioLogado', cadastroData.email);
 
                 navigation.reset({
                   index: 0,

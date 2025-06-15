@@ -8,7 +8,7 @@ const db = SQLite.openDatabase(
 
 const initDB = () => {
   db.transaction(tx => {
-    // Tabela de usuários (se ainda não existir)
+    // Tabela de usuários (professores e alunos)
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +23,7 @@ const initDB = () => {
       (_, error) => console.error('Erro ao criar tabela users:', error),
     );
 
-    // Tabela de treinos com "data" e "ordem"
+    // Tabela de treinos com campo professor_email
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS treinos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,11 +32,24 @@ const initDB = () => {
         data TEXT NOT NULL,
         calorias INTEGER DEFAULT 0,
         ordem INTEGER DEFAULT 0,
+        professor_email TEXT,
         FOREIGN KEY (aluno_email) REFERENCES users(email) ON DELETE CASCADE
       );`,
       [],
       () => console.log('Tabela treinos criada/verificada'),
       (_, error) => console.error('Erro ao criar tabela treinos:', error),
+    );
+
+    // Tentativa de adicionar a coluna professor_email caso já exista a tabela (evita erro na migração)
+    tx.executeSql(
+      `ALTER TABLE treinos ADD COLUMN professor_email TEXT;`,
+      [],
+      () => console.log('Coluna professor_email adicionada na tabela treinos'),
+      (txObj, error) => {
+        if (!error.message.includes('duplicate column name')) {
+          console.error('Erro ao adicionar professor_email:', error);
+        }
+      },
     );
 
     // Tabela de grupos musculares
@@ -49,14 +62,24 @@ const initDB = () => {
       () => console.log('Tabela grupos_musculares criada/verificada'),
       (_, error) => console.error('Erro grupos_musculares:', error),
     );
-
+    // Tabela de treinos finalizados
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS treinos_finalizados (
+      aluno_email TEXT NOT NULL,
+      treino_id INTEGER NOT NULL,
+      PRIMARY KEY (aluno_email, treino_id)
+  );`,
+      [],
+      () => console.log('Tabela treinos_finalizados criada/verificada'),
+      (_, error) => console.error('Erro treinos_finalizados:', error),
+    );
     // Tabela de progresso do aluno
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS progresso_aluno (
-        aluno_email TEXT PRIMARY KEY,
-        ultimo_treino_ordem INTEGER DEFAULT 0,
-        data_ultimo_treino TEXT
-      );`,
+      aluno_email TEXT PRIMARY KEY,
+      ultimo_treino_ordem INTEGER DEFAULT 0,
+      data_ultimo_treino TEXT
+  );`,
       [],
       () => console.log('Tabela progresso_aluno criada/verificada'),
       (_, error) => console.error('Erro progresso_aluno:', error),
@@ -92,7 +115,7 @@ const initDB = () => {
   });
 };
 
-// Serviço auxiliar para manipular exercícios
+// Serviço para exercícios
 const ExercicioService = {
   addExercicio: exercicio => {
     return new Promise((resolve, reject) => {
